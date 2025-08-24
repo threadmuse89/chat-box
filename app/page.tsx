@@ -6,7 +6,7 @@ import { LoginForm } from "@/components/auth/login-form"
 import { ChatInterface } from "@/components/chat/chat-interface"
 
 export default function HomePage() {
-  const { user, login, error, isLoading } = useAuth()
+  const { user, login, signup, error, isLoading } = useAuth()
   const [isSignUp, setIsSignUp] = useState(false)
 
   const handleLogin = async (email: string, password: string) => {
@@ -17,10 +17,19 @@ export default function HomePage() {
     }
   }
 
+  const handleSignup = async (email: string, password: string, confirmPassword: string) => {
+    try {
+      await signup(email, password, confirmPassword)
+    } catch (err) {
+      // Error is handled by the auth provider
+    }
+  }
+
   if (!user) {
     return (
       <LoginForm
         onLogin={handleLogin}
+        onSignup={handleSignup}
         onToggleMode={() => setIsSignUp(!isSignUp)}
         isSignUp={isSignUp}
         error={error}

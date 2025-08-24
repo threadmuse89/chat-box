@@ -10,15 +10,17 @@ import { useTheme } from "next-themes"
 
 interface LoginFormProps {
   onLogin: (email: string, password: string) => Promise<void>
+  onSignup: (email: string, password: string, confirmPassword: string) => Promise<void>
   onToggleMode: () => void
   isSignUp: boolean
   error?: string
   isLoading?: boolean
 }
 
-export function LoginForm({ onLogin, onToggleMode, isSignUp, error, isLoading }: LoginFormProps) {
+export function LoginForm({ onLogin, onSignup, onToggleMode, isSignUp, error, isLoading }: LoginFormProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const { theme, setTheme } = useTheme()
@@ -26,7 +28,11 @@ export function LoginForm({ onLogin, onToggleMode, isSignUp, error, isLoading }:
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (email && password) {
-      await onLogin(email, password)
+      if (isSignUp) {
+        await onSignup(email, password, confirmPassword)
+      } else {
+        await onLogin(email, password)
+      }
     }
   }
 
@@ -72,7 +78,7 @@ export function LoginForm({ onLogin, onToggleMode, isSignUp, error, isLoading }:
 
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md bg-white rounded-3xl p-12 shadow-lg">
-          <h2 className="text-3xl font-bold text-gray-900 mb-8">Log in</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-8">{isSignUp ? "Sign up" : "Log in"}</h2>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Username field */}
@@ -80,7 +86,7 @@ export function LoginForm({ onLogin, onToggleMode, isSignUp, error, isLoading }:
               <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Input
                 type="email"
-                placeholder="Username"
+                placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -114,21 +120,36 @@ export function LoginForm({ onLogin, onToggleMode, isSignUp, error, isLoading }:
               </Button>
             </div>
 
-            {/* Remember me and forgot password */}
-            <div className="flex items-center justify-between">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
+            {isSignUp && (
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Input
+                  type="password"
+                  placeholder="Confirm Password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="w-full pl-12 pr-4 py-4 bg-gray-100 border-0 rounded-xl text-gray-900 placeholder-gray-500 focus:bg-white focus:ring-2 focus:ring-gray-300"
                 />
-                <span className="text-gray-600 text-sm">Remember Me</span>
-              </label>
-              <a href="#" className="text-gray-500 text-sm hover:text-gray-700">
-                Forgot Password?
-              </a>
-            </div>
+              </div>
+            )}
+
+            {!isSignUp && (
+              <div className="flex items-center justify-between">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
+                  />
+                  <span className="text-gray-600 text-sm">Remember Me</span>
+                </label>
+                <a href="#" className="text-gray-500 text-sm hover:text-gray-700">
+                  Forgot Password?
+                </a>
+              </div>
+            )}
 
             {error && (
               <Alert variant="destructive">
@@ -136,13 +157,12 @@ export function LoginForm({ onLogin, onToggleMode, isSignUp, error, isLoading }:
               </Alert>
             )}
 
-            {/* Login button */}
             <Button
               type="submit"
               disabled={isLoading}
               className="w-full py-4 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors font-medium"
             >
-              {isLoading ? "Please wait..." : "Log in"}
+              {isLoading ? "Please wait..." : isSignUp ? "Sign up" : "Log in"}
             </Button>
 
             {/* Divider */}
@@ -155,14 +175,13 @@ export function LoginForm({ onLogin, onToggleMode, isSignUp, error, isLoading }:
               </div>
             </div>
 
-            {/* Sign up button */}
             <Button
               type="button"
               onClick={onToggleMode}
               variant="outline"
               className="w-full py-4 bg-gray-100 text-gray-700 border-0 rounded-xl hover:bg-gray-200 transition-colors font-medium"
             >
-              {isSignUp ? "Log in" : "Sign up"}
+              {isSignUp ? "Already have an account? Log in" : "Don't have an account? Sign up"}
             </Button>
           </form>
         </div>

@@ -11,6 +11,7 @@ interface User {
 interface AuthContextType {
   user: User | null
   login: (email: string, password: string) => Promise<void>
+  signup: (email: string, password: string, confirmPassword: string) => Promise<void>
   logout: () => void
   isLoading: boolean
   error: string | null
@@ -60,10 +61,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
         throw new Error("Password must be at least 6 characters")
       }
 
+      // Check if user exists in localStorage (for demo purposes)
+      const existingUsers = JSON.parse(localStorage.getItem("chatbot-users") || "[]")
+      const existingUser = existingUsers.find((u: any) => u.email === email)
+
+      if (!existingUser) {
+        throw new Error("User not found. Please sign up first.")
+      }
+
+      if (existingUser.password !== password) {
+        throw new Error("Invalid password")
+      }
+
       const newUser: User = {
-        id: Math.random().toString(36).substr(2, 9),
-        email,
-        name: email.split("@")[0],
+        id: existingUser.id,
+        email: existingUser.email,
+        name: existingUser.name,
       }
 
       setUser(newUser)
@@ -76,10 +89,62 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
+  const signup = async (email: string, password: string, confirmPassword: string) => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      // Validation
+      if (password.length < 6) {
+        throw new Error("Password must be at least 6 characters")
+      }
+
+      if (password !== confirmPassword) {
+        throw new Error("Passwords do not match")
+      }
+
+      if (!email.includes("@")) {
+        throw new Error("Please enter a valid email address")
+      }
+
+      // Check if user already exists
+      const existingUsers = JSON.parse(localStorage.getItem("chatbot-users") || "[]")
+      const userExists = existingUsers.find((u: any) => u.email === email)
+
+      if (userExists) {
+        throw new Error("User already exists. Please log in instead.")
+      }
+
+      const newUser: User = {
+        id: Math.random().toString(36).substr(2, 9),
+        email,
+        name: email.split("@")[0],
+      }
+
+      // Save to users list
+      const updatedUsers = [...existingUsers, { ...newUser, password }]
+      localStorage.setItem("chatbot-users", JSON.stringify(updatedUsers))
+
+      // Set current user
+      setUser(newUser)
+      localStorage.setItem("chatbot-user", JSON.stringify(newUser))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign up failed")
+      throw err
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const logout = () => {
     setUser(null)
     localStorage.removeItem("chatbot-user")
   }
 
-  return <AuthContext.Provider value={{ user, login, logout, isLoading, error }}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, login, signup, logout, isLoading, error }}>{children}</AuthContext.Provider>
+  )
 }

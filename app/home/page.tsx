@@ -25,6 +25,9 @@ export default function HomePage() {
               <Link href="/about" className="text-muted-foreground hover:text-foreground transition-colors">
                 ABOUT US
               </Link>
+              <Link href="/deals" className="text-muted-foreground hover:text-foreground transition-colors">
+                DEALS
+              </Link>
               <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
                 CHAT
               </Link>

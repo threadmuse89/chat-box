@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth/auth-provider"
 import { LoginForm } from "@/components/auth/login-form"
 import { ChatInterface } from "@/components/chat/chat-interface"
@@ -8,6 +9,7 @@ import { ChatInterface } from "@/components/chat/chat-interface"
 export default function HomePage() {
   const { user, login, signup, error, isLoading } = useAuth()
   const [isSignUp, setIsSignUp] = useState(false)
+  const router = useRouter()
 
   const handleLogin = async (email: string, password: string) => {
     try {
@@ -23,6 +25,11 @@ export default function HomePage() {
     } catch (err) {
       // Error is handled by the auth provider
     }
+  }
+
+  if (user && !user.hasSelectedPlan) {
+    router.push("/select-plan")
+    return null
   }
 
   if (!user) {

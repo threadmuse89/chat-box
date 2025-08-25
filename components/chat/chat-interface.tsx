@@ -27,7 +27,7 @@ interface ChatHistory {
 }
 
 export function ChatInterface() {
-  const { user, logout } = useAuth()
+  const { user, logout, canSendMessage, incrementMessageCount } = useAuth()
   const { theme, setTheme } = useTheme()
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -162,6 +162,27 @@ export function ChatInterface() {
     e.preventDefault()
     if (!input.trim() || isLoading) return
 
+    const limitCheck = canSendMessage()
+    if (!limitCheck.canSend) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          content: input.trim(),
+          role: "user",
+          createdAt: new Date(),
+        },
+        {
+          id: (Date.now() + 1).toString(),
+          content: limitCheck.reason || "Message limit reached.",
+          role: "assistant",
+          createdAt: new Date(),
+        },
+      ])
+      setInput("")
+      return
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       content: input.trim(),
@@ -172,6 +193,8 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage])
     setInput("")
     setIsLoading(true)
+
+    incrementMessageCount()
 
     try {
       console.log("[v0] Sending request to /api/chat")
@@ -247,6 +270,8 @@ export function ChatInterface() {
     setTheme(theme === "dark" ? "light" : "dark")
   }
 
+  const limitInfo = canSendMessage()
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <div
@@ -319,7 +344,13 @@ export function ChatInterface() {
               <span className="text-sm font-medium text-foreground truncate">
                 {user?.name || user?.email?.split("@")[0]}
               </span>
-              <span className="text-xs text-muted-foreground">Online</span>
+              {user?.plan === "free" && limitInfo.canSend && (
+                <span className="text-xs text-muted-foreground">
+                  Free Plan: {limitInfo.remainingMessages}/50 messages today • {limitInfo.remainingDays} days left
+                </span>
+              )}
+              {user?.plan === "pro" && <span className="text-xs text-emerald-600">Pro Plan • Unlimited</span>}
+              {!user?.plan && <span className="text-xs text-muted-foreground">Online</span>}
             </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
@@ -407,14 +438,36 @@ export function ChatInterface() {
         </ScrollArea>
 
         <div className="p-3 sm:p-4 border-t border-border bg-card shrink-0 pb-safe">
+          {user?.plan === "free" && !limitInfo.canSend && (
+            <div className="max-w-4xl mx-auto mb-3">
+              <Card className="p-4 bg-gradient-to-r from-orange-500/10 to-cyan-500/10 border-orange-200 dark:border-orange-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {limitInfo.remainingDays === 0 ? "Free Trial Expired" : "Daily Limit Reached"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">{limitInfo.reason}</p>
+                  </div>
+                  <Button size="sm" className="bg-gradient-to-r from-orange-500 to-cyan-500 text-white">
+                    Upgrade to Pro
+                  </Button>
+                </div>
+              </Card>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
             <div className="flex gap-2">
               <Input
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Type your message..."
-                disabled={isLoading}
+                placeholder={
+                  user?.plan === "free" && !limitInfo.canSend
+                    ? "Upgrade to Pro to continue chatting..."
+                    : "Type your message..."
+                }
+                disabled={isLoading || (user?.plan === "free" && !limitInfo.canSend)}
                 className="flex-1 min-h-[44px] text-base touch-manipulation"
                 autoFocus
                 autoComplete="off"
@@ -423,7 +476,7 @@ export function ChatInterface() {
               />
               <Button
                 type="submit"
-                disabled={!input.trim() || isLoading}
+                disabled={!input.trim() || isLoading || (user?.plan === "free" && !limitInfo.canSend)}
                 className="min-w-[44px] h-[44px] p-0 touch-manipulation shrink-0"
               >
                 <Send className="w-4 h-4" />

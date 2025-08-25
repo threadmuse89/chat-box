@@ -6,6 +6,11 @@ interface User {
   id: string
   email: string
   name?: string
+  plan?: "free" | "pro"
+  hasSelectedPlan?: boolean
+  planStartDate?: string
+  dailyMessageCount?: number
+  lastMessageDate?: string
 }
 
 interface AuthContextType {
@@ -13,6 +18,9 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>
   signup: (email: string, password: string, confirmPassword: string) => Promise<void>
   logout: () => void
+  selectPlan: (plan: "free" | "pro") => Promise<void>
+  canSendMessage: () => { canSend: boolean; reason?: string; remainingMessages?: number; remainingDays?: number }
+  incrementMessageCount: () => void
   isLoading: boolean
   error: string | null
 }
@@ -36,7 +44,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Check for existing session on mount
   useEffect(() => {
     const savedUser = localStorage.getItem("chatbot-user")
     if (savedUser) {
@@ -53,15 +60,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null)
 
     try {
-      // Simulate API call - replace with actual authentication
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      // Simple validation for demo
       if (password.length < 6) {
         throw new Error("Password must be at least 6 characters")
       }
 
-      // Check if user exists in localStorage (for demo purposes)
       const existingUsers = JSON.parse(localStorage.getItem("chatbot-users") || "[]")
       const existingUser = existingUsers.find((u: any) => u.email === email)
 
@@ -77,6 +81,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         id: existingUser.id,
         email: existingUser.email,
         name: existingUser.name,
+        plan: existingUser.plan,
+        hasSelectedPlan: existingUser.hasSelectedPlan,
+        planStartDate: existingUser.planStartDate,
+        dailyMessageCount: existingUser.dailyMessageCount,
+        lastMessageDate: existingUser.lastMessageDate,
       }
 
       setUser(newUser)
@@ -94,10 +103,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null)
 
     try {
-      // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      // Validation
       if (password.length < 6) {
         throw new Error("Password must be at least 6 characters")
       }
@@ -110,7 +117,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         throw new Error("Please enter a valid email address")
       }
 
-      // Check if user already exists
       const existingUsers = JSON.parse(localStorage.getItem("chatbot-users") || "[]")
       const userExists = existingUsers.find((u: any) => u.email === email)
 
@@ -122,13 +128,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         id: Math.random().toString(36).substr(2, 9),
         email,
         name: email.split("@")[0],
+        hasSelectedPlan: false,
       }
 
-      // Save to users list
       const updatedUsers = [...existingUsers, { ...newUser, password }]
       localStorage.setItem("chatbot-users", JSON.stringify(updatedUsers))
 
-      // Set current user
       setUser(newUser)
       localStorage.setItem("chatbot-user", JSON.stringify(newUser))
     } catch (err) {
@@ -144,7 +149,110 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem("chatbot-user")
   }
 
+  const selectPlan = async (plan: "free" | "pro") => {
+    if (!user) return
+
+    try {
+      const planData =
+        plan === "free"
+          ? {
+              planStartDate: new Date().toISOString(),
+              dailyMessageCount: 0,
+              lastMessageDate: new Date().toDateString(),
+            }
+          : {}
+
+      const updatedUser = { ...user, plan, hasSelectedPlan: true, ...planData }
+
+      setUser(updatedUser)
+      localStorage.setItem("chatbot-user", JSON.stringify(updatedUser))
+
+      const existingUsers = JSON.parse(localStorage.getItem("chatbot-users") || "[]")
+      const updatedUsers = existingUsers.map((u: any) =>
+        u.id === user.id ? { ...u, plan, hasSelectedPlan: true, ...planData } : u,
+      )
+      localStorage.setItem("chatbot-users", JSON.stringify(updatedUsers))
+    } catch (error) {
+      throw new Error("Failed to select plan")
+    }
+  }
+
+  const canSendMessage = () => {
+    if (!user || user.plan !== "free") {
+      return { canSend: true }
+    }
+
+    const now = new Date()
+    const planStartDate = user.planStartDate ? new Date(user.planStartDate) : now
+    const daysSincePlanStart = Math.floor((now.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24))
+
+    if (daysSincePlanStart >= 14) {
+      return {
+        canSend: false,
+        reason: "Your 14-day free trial has expired. Please upgrade to Pro to continue chatting.",
+        remainingDays: 0,
+      }
+    }
+
+    const today = now.toDateString()
+    const lastMessageDate = user.lastMessageDate || today
+    const dailyCount = lastMessageDate === today ? user.dailyMessageCount || 0 : 0
+
+    if (dailyCount >= 50) {
+      return {
+        canSend: false,
+        reason:
+          "You've reached your daily limit of 50 messages. Try again tomorrow or upgrade to Pro for unlimited messages.",
+        remainingMessages: 0,
+        remainingDays: 14 - daysSincePlanStart,
+      }
+    }
+
+    return {
+      canSend: true,
+      remainingMessages: 50 - dailyCount,
+      remainingDays: 14 - daysSincePlanStart,
+    }
+  }
+
+  const incrementMessageCount = () => {
+    if (!user || user.plan !== "free") return
+
+    const today = new Date().toDateString()
+    const lastMessageDate = user.lastMessageDate || today
+    const currentCount = lastMessageDate === today ? user.dailyMessageCount || 0 : 0
+
+    const updatedUser = {
+      ...user,
+      dailyMessageCount: currentCount + 1,
+      lastMessageDate: today,
+    }
+
+    setUser(updatedUser)
+    localStorage.setItem("chatbot-user", JSON.stringify(updatedUser))
+
+    const existingUsers = JSON.parse(localStorage.getItem("chatbot-users") || "[]")
+    const updatedUsers = existingUsers.map((u: any) =>
+      u.id === user.id ? { ...u, dailyMessageCount: currentCount + 1, lastMessageDate: today } : u,
+    )
+    localStorage.setItem("chatbot-users", JSON.stringify(updatedUsers))
+  }
+
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, isLoading, error }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        signup,
+        logout,
+        selectPlan,
+        canSendMessage,
+        incrementMessageCount,
+        isLoading,
+        error,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
   )
 }

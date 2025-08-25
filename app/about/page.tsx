@@ -25,6 +25,9 @@ export default function AboutPage() {
               <Link href="/about" className="text-foreground font-medium">
                 ABOUT US
               </Link>
+              <Link href="/deals" className="text-muted-foreground hover:text-foreground transition-colors">
+                DEALS
+              </Link>
               <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
                 CHAT
               </Link>
